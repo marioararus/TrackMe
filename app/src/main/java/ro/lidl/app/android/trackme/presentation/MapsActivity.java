@@ -5,13 +5,13 @@ import android.annotation.SuppressLint;
 import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.Toast;
@@ -21,7 +21,9 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+import java.util.List;
 
 import ro.lidl.app.android.trackme.R;
 
@@ -42,18 +44,30 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Switch locationSwitch;
 
     /**
-     * This is the Observer of the current activity
+     * This is the Observer for the last known location
      */
     private Observer<Location> locationObserver = new Observer<Location>() {
         @Override
         public void onChanged(@Nullable Location location) {
             /**
-             * Adding a marker on the map with the user's current location if his location is not null
-             * Allow the moving of the map
+             * Zooms in the last known location
              */
             if (location != null) {
-                //mMap.addMarker(new MarkerOptions().position(new LatLng(location.getLatitude(), location.getLongitude())).title("Marker in Sydney"));
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()),5));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 5));
+            }
+        }
+    };
+
+    private Observer<List<Location>> locationsUpdateObserver = new Observer<List<Location>>() {
+        @Override
+        public void onChanged(@Nullable List<Location> locations) {
+            if (locations != null) {
+                for (int i = 0; i < locations.size()-1; i++) {
+                    mMap.addPolyline(new PolylineOptions().add(
+                            new LatLng(locations.get(i).getLatitude(), locations.get(i).getLongitude()),
+                            new LatLng(locations.get(i+1).getLatitude(), locations.get(i+1).getLongitude()))
+                    .color(Color.RED).width(5));
+                }
             }
         }
     };
@@ -87,6 +101,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (requestCode == 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
                 mapsViewModel.retrieveLocation().observe(this, locationObserver);
+                mapsViewModel.getUpdatedLocations().observe(this, locationsUpdateObserver);
             }
         }
     }
@@ -112,6 +127,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     0);
         } else {
             mapsViewModel.retrieveLocation().observe(this, locationObserver);
+            mapsViewModel.getUpdatedLocations().observe(this, locationsUpdateObserver);
         }
     }
 
